@@ -18,6 +18,9 @@ on:
 jobs:
   apisec-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Run APIsec scan and enforce thresholds (Docker)
         id: gate
@@ -51,8 +54,8 @@ jobs:
         run: |
           SCAN_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
             /tmp/apisec-output.txt 2>/dev/null \
-            | grep -v '${{ vars.APISEC_APP_ID }}' \
-            | grep -v '${{ vars.APISEC_INSTANCE_ID }}' \
+            | grep -v '019f9607-3e13-7a57-840b-0982e67875cd' \
+            | grep -v '019f9607-43c8-7a72-89b0-974eef03a7a7' \
             | head -1 || echo "")
           echo "scan_id=${SCAN_ID}" >> "$GITHUB_OUTPUT"
 
@@ -63,7 +66,7 @@ jobs:
           script: |
             const blocked = '${{ steps.gate.outcome }}' !== 'success';
             const scanId  = '${{ steps.scan-id.outputs.scan_id }}';
-            const base    = `https://itau.apisecapps.com/application/${{ vars.APISEC_APP_ID }}/instance/${{ vars.APISEC_INSTANCE_ID }}/scans`;
+            const base    = `https://api.apisecapps.com/application/${{ vars.APISEC_APP_ID }}/instance/${{ vars.APISEC_INSTANCE_ID }}/scans`;
             const scanUrl = scanId ? `${base}/${scanId}` : base;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
