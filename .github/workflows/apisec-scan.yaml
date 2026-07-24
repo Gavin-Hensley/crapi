@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run APIsec scan and enforce thresholds (Docker)
+        id: gate
         env:
           APISEC_TOKEN: ${{ secrets.APISEC_TOKEN }}
           APISEC_HOST: https://api.apisecapps.com
@@ -43,3 +44,42 @@ jobs:
             -e APISEC_MODE \
             -e APISEC_UI_URL \
             "$IMAGE"
+            
+      - name: Extract scan ID from container output
+        id: scan-id
+        if: always()
+        run: |
+          SCAN_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+            /tmp/apisec-output.txt 2>/dev/null \
+            | grep -v '${{ vars.APISEC_APP_ID }}' \
+            | grep -v '${{ vars.APISEC_INSTANCE_ID }}' \
+            | head -1 || echo "")
+          echo "scan_id=${SCAN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Post scan summary to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const blocked = '${{ steps.gate.outcome }}' !== 'success';
+            const scanId  = '${{ steps.scan-id.outputs.scan_id }}';
+            const base    = `https://itau.apisecapps.com/application/${{ vars.APISEC_APP_ID }}/instance/${{ vars.APISEC_INSTANCE_ID }}/scans`;
+            const scanUrl = scanId ? `${base}/${scanId}` : base;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              body: [
+                '## APIsec API Security Scan',
+                '',
+                '| Severity Gate | Result |',
+                '|---|---|',
+                `| 🔴 Critical / High (blocking) | ${blocked ? '❌ **BLOCKED** — resolve findings before merging' : '✅ Passed — no Critical or High findings'} |`,
+                '',
+                `[**View scan results in APIsec →**](${scanUrl})`,
+                '',
+                blocked
+                  ? '> **This PR is blocked from merging.** Resolve all Critical and High severity findings and re-run the scan.'
+                  : '> Scan complete. No Critical or High findings detected.',
+              ].join('\n'),
+            });
