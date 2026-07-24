@@ -1,0 +1,42 @@
+name: apisec scan and gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+#  pull_request:
+#    paths:
+#      - "apisec-scan-and-gate.sh"
+#      - "Dockerfile"
+#      - ".dockerignore"
+#      - ".github/workflows/apisec-scan-and-gate.yml"
+
+jobs:
+  apisec-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run APIsec scan and enforce thresholds (Docker)
+        env:
+          APISEC_TOKEN: ${{ secrets.APISEC_TOKEN }}
+          APISEC_HOST: https://api.apisecapps.com
+          APISEC_APP_ID: 019f9607-3e13-7a57-840b-0982e67875cd
+          APISEC_INSTANCE_ID: 019f9607-43c8-7a72-89b0-974eef03a7a7
+          APISEC_AUTH_ID: ${{ vars.APISEC_AUTH_ID }}
+          APISEC_MAX_CRITICAL: "0"
+          APISEC_MAX_HIGH: "5"
+          APISEC_MODE: "scan" # optional: scan | detections (detections skips the scan)
+          APISEC_UI_URL: https://sfdemo.apisecapps.com # optional: adds direct links to detections
+          IMAGE: docker.io/apisec/apisec-scan-and-gate:latest
+        run: |
+          docker run --rm \
+            -e APISEC_TOKEN \
+            -e APISEC_HOST \
+            -e APISEC_APP_ID \
+            -e APISEC_INSTANCE_ID \
+            -e APISEC_AUTH_ID \
+            -e APISEC_MAX_CRITICAL \
+            -e APISEC_MAX_HIGH \
+            -e APISEC_MODE \
+            -e APISEC_UI_URL \
+            "$IMAGE"
